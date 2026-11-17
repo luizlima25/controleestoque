@@ -21,12 +21,22 @@ npm test
 - **Alertas** (sino) quando atinge o preço-alvo, cai ≥ 5% ou bate mínima histórica; histórico com gráfico.
   Verificação automática a cada `MONITOR_MINUTES` (padrão 5) + botão "Verificar agora".
 
+## Só lojas confiáveis
+
+A opção **"Apenas lojas confiáveis"** (ligada por padrão) filtra *antes* de dar nota, para que preços
+"bons demais" de golpistas não distorçam a mediana:
+
+- **Mercado Livre**: só entram loja oficial, MercadoLíder Gold/Platinum, ou reputação verde com ≥ 100 vendas e ≥ 90% de avaliações positivas.
+- **Links de qualquer loja**: só domínios de uma lista de varejistas conhecidos (Amazon, Magalu, KaBuM!, Casas Bahia, Americanas…).
+  Acrescente os seus com `TRUSTED_DOMAINS=loja.com.br,outra.com` (ou use só os seus com `TRUSTED_DOMAINS_ONLY=1`).
+- O contador mostra quantas ofertas foram ocultas; desmarque a opção para vê-las (com selo "Vendedor não verificado" e nota limitada).
+
 ## Provedores
 
 | id | Descrição |
 |----|-----------|
 | `demo` | Catálogo simulado e determinístico (preços variam com o tempo). Funciona offline. |
-| `mercadolivre` | API pública do Mercado Livre (MLB). Se responder 401/403, defina `ML_TOKEN`. |
+| `mercadolivre` | API oficial do Mercado Livre (MLB). Exige credenciais — veja abaixo. |
 | `pageurl` | Leitor de qualquer página de produto (só para monitorar link). Não funciona com lojas que renderizam o preço só via JavaScript. |
 
 Novo provedor = um arquivo em `lib/providers/` com `{ id, name, search(q), getItem(id) }` retornando
@@ -37,5 +47,11 @@ Novo provedor = um arquivo em `lib/providers/` com `{ id, name, search(q), getIt
 
 ## Configuração
 
-`PORT` (3000) · `HOST` (127.0.0.1) · `MONITOR_MINUTES` (5) · `DATA_DIR` (./data, guarda `db.json`) · `ML_TOKEN`.
+### Mercado Livre: token com renovação automática
+
+1. Crie um app em <https://developers.mercadolivre.com.br> e copie o *Client ID* e o *Secret*.
+2. `ML_CLIENT_ID=... ML_CLIENT_SECRET=... npm start` — o Farejador pede o token, renova antes de vencer
+   e tenta de novo uma vez se a API responder 401/403. (Alternativa sem renovação: `ML_TOKEN`.)
+
+`PORT` (3000) · `HOST` (127.0.0.1) · `MONITOR_MINUTES` (5) · `DATA_DIR` (./data, guarda `db.json`) · `ML_CLIENT_ID`/`ML_CLIENT_SECRET`/`ML_TOKEN` · `TRUSTED_DOMAINS`.
 O servidor não tem autenticação: por padrão só escuta em localhost.

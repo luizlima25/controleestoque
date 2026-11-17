@@ -17,7 +17,7 @@ function toast(msg) {
 
 const TAGS = {
   accessory: ['Provável acessório', 'warn'], used: ['Usado', ''], freeShipping: ['Frete grátis', ''],
-  inflatedDiscount: ['Desconto inflado', 'warn'], historicLow: ['Menor preço já visto', 'good'],
+  inflatedDiscount: ['Desconto inflado', 'warn'], trusted: ['✔ Loja confiável', 'good'], untrusted: ['⚠ Vendedor não verificado', 'warn'], historicLow: ['Menor preço já visto', 'good'],
 };
 let lastSearch = null;
 
@@ -42,7 +42,7 @@ const selectedProviders = () => [...document.querySelectorAll('#providers input:
 async function search() {
   const q = $('#q').value.trim();
   if (!q) return;
-  const params = new URLSearchParams({ q, providers: selectedProviders().join(','), sort: $('#sort').value, cond: $('#cond').value, min: $('#min').value, max: $('#max').value });
+  const params = new URLSearchParams({ q, providers: selectedProviders().join(','), sort: $('#sort').value, cond: $('#cond').value, min: $('#min').value, max: $('#max').value, trusted: $('#trusted').checked ? '1' : '0' });
   $('#empty').textContent = 'Farejando…'; $('#empty').hidden = false; $('#results').innerHTML = '';
   try {
     const r = await api('/api/search?' + params);
@@ -51,7 +51,7 @@ async function search() {
   } catch (e) { $('#empty').textContent = e.message; }
 }
 function renderResults() {
-  const { offers, stats, errors, dropped } = lastSearch;
+  const { offers, stats, errors, dropped, hiddenUntrusted } = lastSearch;
   $('#errors').innerHTML = errors.map((e) => `<div class="err"><b>${esc(e.provider)}</b>: ${esc(e.message)}</div>`).join('');
   $('#empty').hidden = offers.length > 0;
   if (!offers.length) $('#empty').textContent = 'Nenhuma oferta encontrada com esses filtros.';
@@ -63,13 +63,14 @@ function renderResults() {
       <div><b>${brl(stats.median)}</b><span>preço típico (mediana)</span></div>
       <div><b>${brl(stats.max)}</b><span>maior preço</span></div>
       ${dropped ? `<div><b>${dropped}</b><span>descartadas (fora do assunto)</span></div>` : ''}
+      ${hiddenUntrusted ? `<div><b>${hiddenUntrusted}</b><span>ocultas (vendedor não confiável)</span></div>` : ''}
       <div class="actions"><button class="ghost" id="watchQuery">🔔 Monitorar esta busca</button></div>`;
-    $('#watchQuery').onclick = () => addWatch({ type: 'query', query: lastSearch.q, providers: lastSearch.providers, cond: $('#cond').value === 'used' ? 'used' : 'new' }, 'Monitorando a melhor oferta de “' + lastSearch.q + '”');
+    $('#watchQuery').onclick = () => addWatch({ type: 'query', query: lastSearch.q, providers: lastSearch.providers, trustedOnly: lastSearch.trustedOnly, cond: $('#cond').value === 'used' ? 'used' : 'new' }, 'Monitorando a melhor oferta de “' + lastSearch.q + '”');
   }
   $('#results').innerHTML = offers.map(card).join('');
   $('#results').querySelectorAll('[data-watch]').forEach((b) => (b.onclick = () => {
     const o = offers[+b.dataset.watch];
-    addWatch({ type: 'item', provider: o.provider, itemId: o.id, url: o.url }, 'Monitorando este anúncio');
+    addWatch({ type: 'item', provider: o.provider, itemId: o.id, url: o.url, trustedOnly: lastSearch.trustedOnly }, 'Monitorando este anúncio');
   }));
 }
 function card(o, i) {
@@ -84,7 +85,7 @@ function card(o, i) {
     <div><span class="price">${brl(o.price)}</span>${o.oldPrice ? `<span class="old">${brl(o.oldPrice)}</span>` : ''}</div>
     <div class="verdict">${esc(o.verdict)} ${vs}</div>
     <div class="store">${esc(o.store)}${o.rating ? ` · ★ ${o.rating}` : ''}</div>
-    <div class="tags">${o.flags.map((f) => TAGS[f] && `<span class="tag ${TAGS[f][1]}">${TAGS[f][0]}</span>`).join('')}</div>
+    <div class="tags">${o.flags.map((f) => TAGS[f] && `<span class="tag ${TAGS[f][1]}" ${f === 'trusted' && o.trustReason ? `title="${esc(o.trustReason)}"` : ''}>${TAGS[f][0]}</span>`).join('')}</div>
     <div class="row">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"><button class="ghost">Ver oferta ↗</button></a>` : '<span class="tag">simulado</span>'}
       <button class="ghost" data-watch="${i}">🔔 Monitorar anúncio</button></div>
   </article>`;
@@ -159,12 +160,12 @@ $('#bell').onclick = async () => {
 
 // ---------- eventos ----------
 $('#searchForm').addEventListener('submit', (e) => { e.preventDefault(); search(); });
-['sort', 'cond'].forEach((id) => $('#' + id).addEventListener('change', () => lastSearch && search()));
+['sort', 'cond', 'trusted'].forEach((id) => $('#' + id).addEventListener('change', () => lastSearch && search()));
 $('#urlForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const target = $('#urlTarget').value || null;
   try {
-    await api('/api/watches', { method: 'POST', body: { type: 'item', provider: 'pageurl', url: $('#urlInput').value, target } });
+    await api('/api/watches', { method: 'POST', body: { type: 'item', provider: 'pageurl', url: $('#urlInput').value, target, trustedOnly: $('#trusted').checked } });
     toast('Link monitorado'); $('#urlInput').value = ''; refreshCounts(); showTab('watch');
   } catch (err) { toast(err.message); }
 });

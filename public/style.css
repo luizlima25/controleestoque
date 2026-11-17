@@ -56,3 +56,4 @@ button.danger{color:var(--bad)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;z-index:20}
 @media (max-width:600px){.providers{margin-left:0}.top{flex-wrap:wrap}}
 .providers input{width:auto}.row .tag{align-self:center}
+.filters .trust{flex-direction:row;align-items:center;gap:6px;color:var(--ink)}.filters .trust input{width:auto}

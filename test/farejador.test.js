@@ -73,3 +73,72 @@ test('alertas: alvo, queda e sem repetição', () => {
   assert.equal(detectAlerts(w2, { price: 90, t: 1 })[0].kind, 'drop');
   assert.equal(median([3, 1, 2]), 2);
 });
+
+// ---------- confiança e renovação de token ----------
+import { mlSellerTrust, isTrustedUrl } from '../lib/trust.js';
+import { createAuth, createMercadoLivre } from '../lib/providers/mercadolivre.js';
+import { runSearch } from '../lib/search.js';
+
+test('mlSellerTrust: loja oficial, MercadoLíder, reputação verde e desconhecido', () => {
+  assert.equal(mlSellerTrust({ official_store_id: 1 }).trusted, true);
+  assert.equal(mlSellerTrust({ seller: { seller_reputation: { power_seller_status: 'platinum' } } }).trusted, true);
+  const verde = { level_id: '5_green', transactions: { completed: 500, ratings: { positive: 0.97 } } };
+  assert.equal(mlSellerTrust({ seller: { seller_reputation: verde } }).trusted, true);
+  const novo = { level_id: '5_green', transactions: { completed: 5, ratings: { positive: 1 } } };
+  assert.equal(mlSellerTrust({ seller: { seller_reputation: novo } }).trusted, false, 'poucas vendas não bastam');
+  assert.equal(mlSellerTrust({ seller: { seller_reputation: { level_id: '2_orange' } } }).trusted, false);
+  assert.equal(mlSellerTrust({ seller: {} }).trusted, null);
+});
+
+test('isTrustedUrl: domínios e subdomínios, e não engana com sufixo parecido', () => {
+  assert.ok(isTrustedUrl('https://www.kabum.com.br/produto/1'));
+  assert.ok(!isTrustedUrl('https://kabum.com.br.golpe.xyz/p'));
+  assert.ok(!isTrustedUrl('https://naokabum.com.br/p'));
+  assert.ok(isTrustedUrl('https://minhaloja.com/p', { TRUSTED_DOMAINS: 'minhaloja.com' }));
+  assert.ok(!isTrustedUrl('lixo'));
+});
+
+test('token: renova ao vencer, sem pedidos duplicados', async () => {
+  let t = 0, tokens = 0;
+  const calls = [];
+  const fetchFn = async (url, opts) => {
+    calls.push(url);
+    if (url.endsWith('/oauth/token')) {
+      tokens++;
+      assert.match(opts.body, /grant_type=client_credentials/);
+      return { ok: true, status: 200, json: async () => ({ access_token: 'tk' + tokens, expires_in: 600 }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ results: [{ id: 'A', title: 'X', price: 1 }] }) };
+  };
+  const auth = createAuth({ env: { ML_CLIENT_ID: 'i', ML_CLIENT_SECRET: 's' }, fetchFn, now: () => t });
+  const ml = createMercadoLivre({ auth, fetchFn });
+  await Promise.all([ml.search('a'), ml.search('b')]);
+  assert.equal(tokens, 1, 'dois pedidos simultâneos compartilham um único token');
+  t += 700_000; // passou do vencimento
+  await ml.search('c');
+  assert.equal(tokens, 2);
+});
+
+test('token: 403 com token auto renova e repete uma vez; sem credenciais dá erro claro', async () => {
+  let tokens = 0, hits = 0;
+  const fetchFn = async (url) => {
+    if (url.endsWith('/oauth/token')) { tokens++; return { ok: true, status: 200, json: async () => ({ access_token: 't' + tokens, expires_in: 21600 }) }; }
+    hits++;
+    return hits === 1 ? { ok: false, status: 403 } : { ok: true, status: 200, json: async () => ({ results: [] }) };
+  };
+  const ml = createMercadoLivre({ auth: createAuth({ env: { ML_CLIENT_ID: 'i', ML_CLIENT_SECRET: 's' }, fetchFn }), fetchFn });
+  await ml.search('x');
+  assert.deepEqual([tokens, hits], [2, 2]);
+
+  const semCred = createMercadoLivre({ auth: createAuth({ env: {}, fetchFn }), fetchFn: async () => ({ ok: false, status: 403 }) });
+  await assert.rejects(semCred.search('x'), /ML_CLIENT_ID/);
+});
+
+test('runSearch: oculta não confiáveis antes de calcular a mediana', async () => {
+  const withUntrusted = await runSearch({ q: 'air fryer', providerIds: ['demo'], trustedOnly: false });
+  const only = await runSearch({ q: 'air fryer', providerIds: ['demo'], trustedOnly: true });
+  assert.ok(only.hiddenUntrusted > 0);
+  assert.ok(only.offers.every((o) => !o.flags.includes('untrusted')));
+  assert.ok(withUntrusted.offers.some((o) => o.flags.includes('untrusted')));
+  assert.ok(withUntrusted.offers.filter((o) => o.flags.includes('untrusted')).every((o) => o.score <= 40));
+});

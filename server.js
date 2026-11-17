@@ -35,6 +35,7 @@ async function api(req, res, url) {
     const r = await runSearch({
       q: text, providerIds: (q.get('providers') ?? '').split(',').filter(Boolean),
       min: num(q.get('min')), max: num(q.get('max')), cond: q.get('cond') ?? 'all', sort: q.get('sort') ?? 'score',
+      trustedOnly: q.get('trusted') !== '0',
     });
     return json(res, 200, r);
   }
@@ -50,14 +51,14 @@ async function api(req, res, url) {
       const id = b.provider === 'pageurl' ? String(b.url ?? '').trim() : String(b.itemId ?? '');
       if (!id) return json(res, 400, { error: 'Informe o link ou o anúncio' });
       let item;
-      try { item = await prov.getItem(id); } catch (e) { return json(res, 422, { error: e.message }); }
+      try { item = await prov.getItem(id, { trustedOnly: b.trustedOnly !== false }); } catch (e) { return json(res, 422, { error: e.message }); }
       if (!item) return json(res, 422, { error: 'Anúncio não encontrado' });
-      Object.assign(w, { type: 'item', title: item.title, image: item.image, item: { provider: b.provider, id } });
+      Object.assign(w, { trustedOnly: b.trustedOnly !== false, type: 'item', title: item.title, image: item.image, item: { provider: b.provider, id } });
     } else {
       const query = String(b.query ?? '').trim();
       if (!query) return json(res, 400, { error: 'Informe a busca' });
       const ids = (b.providers ?? []).filter((id) => providers[id]?.searchable !== false && providers[id]);
-      Object.assign(w, { type: 'query', query, providers: ids.length ? ids : ['demo'], cond: b.cond === 'used' ? 'used' : 'new' });
+      Object.assign(w, { trustedOnly: b.trustedOnly !== false, type: 'query', query, providers: ids.length ? ids : ['demo'], cond: b.cond === 'used' ? 'used' : 'new' });
     }
     store.data.watches.unshift(w);
     await checkWatch(store, w);
