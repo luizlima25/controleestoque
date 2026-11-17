@@ -1,0 +1,12 @@
+{
+  "name": "farejador",
+  "version": "1.0.0",
+  "description": "Farejador: buscador de ofertas com score próprio e monitoramento de produtos salvos",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}
