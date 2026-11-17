@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farejador de Ofertas</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f6f4a'/%3E%3Cpath d='M9 21l5-6 4 4 5-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">◢</span> Farejador<small>de ofertas</small></div>
+  <nav>
+    <button class="tab active" data-tab="search">Buscar</button>
+    <button class="tab" data-tab="watch">Monitorados <span id="watchCount" class="pill">0</span></button>
+  </nav>
+  <button id="bell" class="bell" aria-label="Alertas">🔔<span id="bellCount" class="dot" hidden>0</span></button>
+</header>
+
+<aside id="alerts" class="alerts" hidden></aside>
+
+<main>
+<section id="tab-search">
+  <form id="searchForm" class="searchbar">
+    <input id="q" type="search" placeholder="O que você quer comprar? ex.: notebook, air fryer, fone bluetooth" autocomplete="off" required>
+    <button class="primary">Farejar</button>
+  </form>
+  <div class="filters">
+    <label>Mín R$ <input id="min" type="number" min="0" step="1"></label>
+    <label>Máx R$ <input id="max" type="number" min="0" step="1"></label>
+    <label>Condição
+      <select id="cond"><option value="all">Todas</option><option value="new">Novo</option><option value="used">Usado</option></select></label>
+    <label>Ordenar
+      <select id="sort"><option value="score">Melhor oferta</option><option value="price">Menor preço</option><option value="discount">Maior economia real</option></select></label>
+    <label class="trust"><input type="checkbox" id="trusted" checked> Apenas lojas confiáveis</label>
+    <span id="providers" class="providers"></span>
+  </div>
+
+  <div id="summary" class="summary" hidden></div>
+  <div id="errors"></div>
+  <div id="results" class="grid"></div>
+  <p id="empty" class="muted center">Busque um produto para comparar preços. O Farejador dá uma nota para cada oferta comparando com o mercado — não com o “de/por” da loja.</p>
+
+  <details class="urlbox">
+    <summary>Quer monitorar um produto específico de qualquer loja? Cole o link</summary>
+    <form id="urlForm" class="searchbar">
+      <input id="urlInput" type="url" placeholder="https://loja.com.br/produto..." required>
+      <input id="urlTarget" type="number" min="0" step="0.01" placeholder="Preço-alvo (opcional)">
+      <button class="primary">Monitorar link</button>
+    </form>
+  </details>
+</section>
+
+<section id="tab-watch" hidden>
+  <div id="watchList" class="watchlist"></div>
+  <p id="watchEmpty" class="muted center">Nada monitorado ainda. Faça uma busca e clique em “Monitorar busca” ou em “Monitorar anúncio”.</p>
+</section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script src="app.js" type="module"></script>
+</body>
+</html>
