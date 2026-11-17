@@ -142,3 +142,36 @@ test('runSearch: oculta não confiáveis antes de calcular a mediana', async () 
   assert.ok(withUntrusted.offers.some((o) => o.flags.includes('untrusted')));
   assert.ok(withUntrusted.offers.filter((o) => o.flags.includes('untrusted')).every((o) => o.score <= 40));
 });
+
+// ---------- Shopee ----------
+import { createShopee, mapNode as shopeeNode, sign } from '../lib/providers/shopee.js';
+
+test('shopee: assinatura SHA256 conforme a documentação (AppID+Timestamp+Payload+Secret)', () => {
+  const h = sign({ appId: 'A', secret: 'S', timestamp: '1700000000', payload: '{"q":1}' });
+  assert.match(h, /^SHA256 Credential=A, Timestamp=1700000000, Signature=[0-9a-f]{64}$/);
+  const again = sign({ appId: 'A', secret: 'S', timestamp: '1700000000', payload: '{"q":1}' });
+  assert.equal(h, again);
+  assert.notEqual(h, sign({ appId: 'A', secret: 'S', timestamp: '1700000000', payload: '{"q":2}' }));
+});
+
+test('shopee: mapeia produto, desconto e selo de confiança', () => {
+  const m = shopeeNode({ itemId: 99, productName: 'Fone', priceMin: '80.00', priceDiscountRate: 20, shopName: 'Loja', shopType: [2], ratingStar: '4.86', productLink: 'https://shopee.com.br/p', sales: 300 });
+  assert.deepEqual([m.id, m.price, m.oldPrice, m.trusted, m.rating], ['99', 80, 100, true, 4.9]);
+  assert.equal(shopeeNode({ itemId: 1, productName: 'x', priceMin: '10', shopType: [] }).trusted, false);
+});
+
+test('shopee: envia corpo assinado e trata erros do GraphQL e falta de credenciais', async () => {
+  let sent;
+  const env = { SHOPEE_APP_ID: 'A', SHOPEE_SECRET: 'S' };
+  const ok = createShopee({ env, now: () => 1700000000, fetchFn: async (url, o) => {
+    sent = { url, o };
+    return { ok: true, status: 200, json: async () => ({ data: { productOfferV2: { nodes: [{ itemId: 5, productName: 'Air Fryer', priceMin: '299.9', shopType: [1] }] } } }) };
+  } });
+  const r = await ok.search('air "fryer"');
+  assert.equal(r[0].price, 299.9);
+  assert.match(sent.o.body, /keyword: \\"air \\\\\\"fryer\\\\\\"\\"/);
+  assert.ok(sent.o.headers.Authorization.includes('Signature='));
+  await assert.rejects(createShopee({ env, fetchFn: async () => ({ ok: true, json: async () => ({ errors: [{ message: 'invalid' }] }) }) }).search('x'), /Shopee: invalid/);
+  await assert.rejects(createShopee({ env: {} }).search('x'), /SHOPEE_APP_ID/);
+  assert.equal(createShopee({ env: {} }).available(), false);
+});

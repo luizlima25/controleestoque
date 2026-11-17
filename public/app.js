@@ -33,8 +33,11 @@ document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () 
 // ---------- provedores ----------
 async function loadProviders() {
   const list = (await api('/api/providers')).filter((p) => p.searchable);
-  $('#providers').innerHTML = list.map((p, i) =>
-    `<label><input type="checkbox" value="${p.id}" ${i === 0 || p.id === 'demo' ? 'checked' : ''}> ${esc(p.name)}</label>`).join('');
+  const real = list.filter((p) => p.id !== 'demo' && p.available);
+  $('#providers').innerHTML = list.map((p) => {
+    const on = real.length ? real.includes(p) : p.id === 'demo';
+    return `<label title="${p.available ? '' : 'Configure as credenciais no servidor (veja o README)'}"><input type="checkbox" value="${p.id}" ${on ? 'checked' : ''} ${p.available ? '' : 'disabled'}> ${esc(p.name)}${p.available ? '' : ' <small class="muted">(sem credenciais)</small>'}</label>`;
+  }).join('');
 }
 const selectedProviders = () => [...document.querySelectorAll('#providers input:checked')].map((i) => i.value);
 

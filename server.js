@@ -22,7 +22,7 @@ const readBody = (req) => new Promise((ok, fail) => {
   req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { fail(new Error('JSON inválido')); } });
 });
 const num = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
-const publicProviders = () => Object.values(providers).map((p) => ({ id: p.id, name: p.name, searchable: p.searchable !== false }));
+const publicProviders = () => Object.values(providers).map((p) => ({ id: p.id, name: p.name, searchable: p.searchable !== false, available: p.available() }));
 
 async function api(req, res, url) {
   const p = url.pathname, m = req.method, q = url.searchParams;
